@@ -13,10 +13,8 @@
 })();
 
 (function() {
-  // === Get current route ===
   const route = window.location.pathname;
 
-  // === Helper function to get buttons and links inside a container ===
   function getButtons(container) {
     const buttons = container.querySelectorAll("button, a");
     const btnList = [];
@@ -24,7 +22,7 @@
       const text = btn.innerText.trim();
       if (text) {
         btnList.push({
-          text: text,
+          text,
           id: btn.id || null,
           className: btn.className || null,
           tag: btn.tagName
@@ -34,36 +32,41 @@
     return btnList;
   }
 
-  // === Helper function to get sections ===
   function getSections() {
-    const sections = document.querySelectorAll("section, div"); // basic containers
+    const containers = document.querySelectorAll("div"); // React usually uses divs
     const result = [];
-
-    sections.forEach(sec => {
-      // Only include sections with visible text or buttons
-      const text = sec.innerText.trim();
-      const buttons = getButtons(sec);
+    containers.forEach(c => {
+      const text = c.innerText.trim();
+      const buttons = getButtons(c);
       if (text || buttons.length > 0) {
         result.push({
-          sectionTitle: sec.getAttribute("id") || sec.getAttribute("class") || "unknown",
-          content: text ? text.substring(0, 200) : "", // limit content preview
-          buttons: buttons
+          sectionTitle: c.id || c.className || "unknown",
+          content: text ? text.substring(0, 200) : "",
+          buttons
         });
       }
     });
-
     return result;
   }
 
-  // === Build structured JSON ===
-  const pageStructure = {
-    route: route,
-    timestamp: new Date().toISOString(),
-    sections: getSections()
-  };
+  function scanPage() {
+    const pageStructure = {
+      route: window.location.pathname,
+      timestamp: new Date().toISOString(),
+      sections: getSections()
+    };
+    console.log("Page Structure JSON:");
+    console.log(JSON.stringify(pageStructure, null, 2));
+  }
 
-  // === Log it nicely ===
-  console.log("Page Structure JSON:");
-  console.log(JSON.stringify(pageStructure, null, 2));
+  // === Observe DOM changes ===
+  const observer = new MutationObserver(() => {
+    scanPage();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // Initial scan in case some content is already loaded
+  scanPage();
 })();
+
 
