@@ -1,79 +1,99 @@
-(function() {
-  const siteKey = document.currentScript.dataset.key;
-  let sessionId = localStorage.getItem("ai_session");
-  if (!sessionId) {
-    sessionId = crypto.randomUUID();
-    localStorage.setItem("ai_session", sessionId);
-  }
+/**
+ * AI SDK - Modular Version
+ * Built for React, Next.js, and Vanilla HTML
+ */
 
-  console.log("AI Agent SDK loaded");
-  console.log("Site Key:", siteKey);
-  console.log("Session ID:", sessionId);
+const AISDK = (function() {
+  // --- 1. State Management (High Cohesion: Identity & State) ---
+  const state = {
+    siteKey: document.currentScript?.dataset?.key || "default_key",
+    sessionId: localStorage.getItem("ai_session") || crypto.randomUUID(),
+    lastPath: window.location.pathname
+  };
 
-})();
+  const initStorage = () => {
+    localStorage.setItem("ai_session", state.sessionId);
+  };
 
-(function() {
-  const route = window.location.pathname;
-
-  let hasLogged = false
-
-  function getButtons(container) {
-    const buttons = container.querySelectorAll("button, a");
-    const btnList = [];
-    buttons.forEach(btn => {
-      const text = btn.innerText.trim();
-      if (text) {
-        btnList.push({
-          text,
+  // --- 2. Scraper Engine (High Cohesion: Data Extraction) ---
+  const Scraper = {
+    getButtons: (container) => {
+      return Array.from(container.querySelectorAll("button, a"))
+        .map(btn => ({
+          text: btn.innerText.trim(),
           id: btn.id || null,
-          className: btn.className || null,
           tag: btn.tagName
-        });
-      }
-    });
-    return btnList;
-  }
+        }))
+        .filter(b => b.text);
+    },
 
-  function getSections() {
-    const containers = document.querySelectorAll("div"); // React usually uses divs
-    const result = [];
-    containers.forEach(c => {
-      const text = c.innerText.trim();
-      const buttons = getButtons(c);
-      if (text || buttons.length > 0) {
-        result.push({
-          sectionTitle: c.id || c.className || "unknown",
-          content: text ? text.substring(0, 200) : "",
-          buttons
-        });
-      }
-    });
-    return result;
-  }
+    getSections: () => {
+      const containers = document.querySelectorAll("section, main, [role='main'], .container");
+      return Array.from(containers).map(c => ({
+        id: c.id || c.className || "unknown",
+        text: c.innerText.substring(0, 100),
+        buttons: Scraper.getButtons(c)
+      }));
+    },
 
-  function scanPage() {
-
-    if(hasLogged) return 
-
-    const pageStructure = {
+    serializePage: () => ({
       route: window.location.pathname,
       timestamp: new Date().toISOString(),
-      sections: getSections()
-    };
-    console.log("Page Structure JSON:");
-    console.log(JSON.stringify(pageStructure, null, 2));
+      sections: Scraper.getSections()
+    })
+  };
 
-    hasLogged = true
-  }
+  // --- 3. Event Orchestrator (Low Coupling: Linking Events to Scraper) ---
+  const Observer = {
+    debounceTimeout: null,
 
-  // === Observe DOM changes ===
-  const observer = new MutationObserver(() => {
-    scanPage();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+    handleUpdate: () => {
+      clearTimeout(Observer.debounceTimeout);
+      Observer.debounceTimeout = setTimeout(() => {
+        const data = Scraper.serializePage();
+        console.group(`🔍 SDK Scan: ${data.route}`);
+        console.dir(data);
+        console.groupEnd();
+      }, 800);
+    },
 
-  // Initial scan in case some content is already loaded
-  scanPage();
+    watchMutations: () => {
+      const observer = new MutationObserver((mutations) => {
+        const significant = mutations.some(m => m.addedNodes.length > 0);
+        if (significant) Observer.handleUpdate();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    },
+
+    watchRoutes: () => {
+      // Logic for SPAs (React/Next)
+      const patch = (type) => {
+        const orig = history[type];
+        return function() {
+          const rv = orig.apply(this, arguments);
+          if (state.lastPath !== window.location.pathname) {
+            state.lastPath = window.location.pathname;
+            Observer.handleUpdate();
+          }
+          return rv;
+        };
+      };
+      history.pushState = patch('pushState');
+      history.replaceState = patch('replaceState');
+      window.addEventListener("popstate", () => Observer.handleUpdate());
+    }
+  };
+
+  // --- 4. Public API / Boot ---
+  return {
+    start: () => {
+      initStorage();
+      Observer.watchMutations();
+      Observer.watchRoutes();
+      Observer.handleUpdate(); // Initial scan
+      console.log("✅ AI SDK Started");
+    }
+  };
 })();
 
-
+AISDK.start();
