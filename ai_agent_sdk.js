@@ -13,8 +13,13 @@
 })();
 
 (function() {
+  // Track if we've already logged
+  let hasLogged = false;
+
+  // Get current route
   const route = window.location.pathname;
 
+  // Helper to get buttons inside a container
   function getButtons(container) {
     const buttons = container.querySelectorAll("button, a");
     const btnList = [];
@@ -32,10 +37,15 @@
     return btnList;
   }
 
+  // Helper to get sections
   function getSections() {
-    const containers = document.querySelectorAll("div"); // React usually uses divs
+    const containers = document.querySelectorAll("div");
     const result = [];
     containers.forEach(c => {
+      // Ignore invisible elements
+      const style = window.getComputedStyle(c);
+      if (style.display === "none" || style.visibility === "hidden" || c.offsetHeight === 0) return;
+
       const text = c.innerText.trim();
       const buttons = getButtons(c);
       if (text || buttons.length > 0) {
@@ -49,24 +59,31 @@
     return result;
   }
 
+  // Scan the page and log JSON
   function scanPage() {
+    if (hasLogged) return; // only log once
+
     const pageStructure = {
       route: window.location.pathname,
       timestamp: new Date().toISOString(),
       sections: getSections()
     };
+
     console.log("Page Structure JSON:");
     console.log(JSON.stringify(pageStructure, null, 2));
+
+    hasLogged = true;
   }
 
-  // === Observe DOM changes ===
+  // Use MutationObserver to wait for React rendering
   const observer = new MutationObserver(() => {
-    scanPage();
+    scanPage(); // will only log once
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Initial scan in case some content is already loaded
+  // Initial scan in case content is already loaded
   scanPage();
 })();
+
 
 
